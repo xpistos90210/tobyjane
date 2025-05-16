@@ -9,15 +9,15 @@ df = pd.read_csv("cleaned_ctg_uc_sites.csv")
 df['start_date'] = pd.to_datetime(df['start_date'], errors='coerce')
 df['primary_completion_date'] = pd.to_datetime(df['primary_completion_date'], errors='coerce')
 
-# Phase tagging
-def map_phase(phase_str):
-    if pd.isna(phase_str): return 'unknown'
-    p = phase_str.lower()
-    if 'early phase 1' in p or 'phase 1' in p: return 'phase_1'
-    elif 'phase 2' in p: return 'phase_2'
-    return 'other'
+# Parse multi-phase values and normalize
+def map_phases(phase_str):
+    if pd.isna(phase_str):
+        return []
+    return [p.strip().lower() for p in str(phase_str).split('|')]
 
-df['phase_tag'] = df['phases'].apply(map_phase)
+df['phase_tags'] = df['phases'].apply(map_phases)
+df['is_phase_1'] = df['phase_tags'].apply(lambda tags: any('phase1' in p for p in tags))
+df['is_phase_2'] = df['phase_tags'].apply(lambda tags: any('phase2' in p for p in tags))
 
 # Keyword scoring
 keywords = [
@@ -39,8 +39,6 @@ site_summary = (
     df.groupby('institution')
       .agg(
           n_trials=('nct_number', 'nunique'),
-          phase_1_trials=('phase_tag', lambda x: (x == 'phase_1').sum()),
-          phase_2_trials=('phase_tag', lambda x: (x == 'phase_2').sum()),
           last_start_date=('start_date', 'max'),
           last_complete_date=('primary_completion_date', 'max'),
           active_trials=('study_status', lambda x: x.str.lower().str.contains("recruiting|not yet|active").sum()),
@@ -48,6 +46,17 @@ site_summary = (
       )
       .reset_index()
 )
+
+# Add phase counts
+phase_counts = (
+    df.groupby('institution')
+      .agg(
+          phase_1_trials=('is_phase_1', 'sum'),
+          phase_2_trials=('is_phase_2', 'sum')
+      )
+      .reset_index()
+)
+site_summary = site_summary.merge(phase_counts, on='institution', how='left')
 
 # Recency calculation
 site_summary['years_since_last_start'] = (pd.Timestamp.now() - site_summary['last_start_date']).dt.days / 365.25
