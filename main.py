@@ -58,6 +58,20 @@ site_summary = site_summary.merge(phase_counts, on='institution', how='left')
 site_summary['years_since_last_start'] = (pd.Timestamp.now() - site_summary['last_start_date']).dt.days / 365.25
 site_summary = site_summary.fillna({'years_since_last_start': site_summary['years_since_last_start'].max()})
 
+# --- Initial Weights & Scoring Setup ---
+volume_wt = early_phase_wt = recency_penalty = mechanism_wt = competition_penalty = 0
+
+def calculate_score(df):
+    return (
+        df['n_trials'] * volume_wt +
+        df['phase_1_trials'] * early_phase_wt +
+        df['keyword_signal'] * mechanism_wt -
+        df['years_since_last_start'] * recency_penalty -
+        df['active_trials'] * competition_penalty
+    )
+
+site_summary['score'] = calculate_score(site_summary)
+
 # --- Streamlit UI ---
 st.set_page_config(layout="wide")
 st.title("Urothelial Cancer Trial Site Scorer")
@@ -74,6 +88,9 @@ with col1:
 
     x_axis = st.selectbox("X Axis", ['n_trials', 'phase_1_trials', 'keyword_signal', 'years_since_last_start'])
     y_axis = st.selectbox("Y Axis", ['score', 'keyword_signal', 'years_since_last_start', 'active_trials'])
+
+    # Update score after sliders
+    site_summary['score'] = calculate_score(site_summary)
 
     st.markdown("""
     **Bubble size** represents the number of Phase 1 urothelial cancer trials conducted by the site.  
@@ -95,17 +112,6 @@ with col1:
     )
 
 with col2:
-    def calculate_score(df):
-        return (
-            df['n_trials'] * volume_wt +
-            df['phase_1_trials'] * early_phase_wt +
-            df['keyword_signal'] * mechanism_wt -
-            df['years_since_last_start'] * recency_penalty -
-            df['active_trials'] * competition_penalty
-        )
-
-    site_summary['score'] = calculate_score(site_summary)
-
     x_vals = site_summary[x_axis]
     y_vals = site_summary[y_axis]
     x_median = x_vals.median()
