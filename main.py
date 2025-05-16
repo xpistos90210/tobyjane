@@ -55,6 +55,8 @@ phase_counts = (
 )
 site_summary = site_summary.merge(phase_counts, on='institution', how='left')
 
+site_summary['total_phase_1_2_trials'] = site_summary['phase_1_trials'] + site_summary['phase_2_trials']
+
 site_summary['years_since_last_start'] = (pd.Timestamp.now() - site_summary['last_start_date']).dt.days / 365.25
 site_summary = site_summary.fillna({'years_since_last_start': site_summary['years_since_last_start'].max()})
 
@@ -93,10 +95,10 @@ with col1:
     site_summary['score'] = calculate_score(site_summary)
 
     st.markdown("""
-    **Bubble size** represents the number of Phase 1 urothelial cancer trials conducted by the site.  
+    **Bubble size** represents the total number of Phase 1 and Phase 2 urothelial cancer trials conducted by the site.  
     **Bubble color** represents the overall weighted score based on the criteria you've selected above.  
     Quadrants are determined by the median values of the X and Y axes.  
-    
+
     **Quadrant Labels:**  
     ⬆ High Potential – High Score & High Feature Strength  
     ↘ Monitor – High Score but Lower Feature Strength  
@@ -121,7 +123,7 @@ with col2:
         site_summary,
         x=x_axis,
         y=y_axis,
-        size='phase_1_trials',
+        size='total_phase_1_2_trials',
         color='score',
         hover_name='institution',
         title="Site Scoring Bubble Plot",
